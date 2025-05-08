@@ -1,37 +1,34 @@
-
 "use client";
 
-import type { CheckInData } from '@/types';
+import type { CheckInData, AttendanceSession } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import AttendanceTable from './attendance-table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { WifiOff, Loader2, ServerCrash } from 'lucide-react'; // WifiOff can represent general connection issues
+import { WifiOff, Loader2, ServerCrash } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
-const POLLING_INTERVAL = 5000; // 5 seconds, matches session status poll
+const POLLING_INTERVAL = 5000; 
 const API_ENDPOINT_LIST = '/api/list';
 
-// Generate a simple client-side ID if API doesn't provide one, for React keys
 let idCounter = 0;
 const generateId = () => `client-checkin-${idCounter++}`;
 
 interface DashboardClientProps {
   currentSessionId: string | null;
+  currentSessionStatus: AttendanceSession['status'] | null;
 }
 
-export default function DashboardClient({ currentSessionId }: DashboardClientProps) {
+export default function DashboardClient({ currentSessionId, currentSessionStatus }: DashboardClientProps) {
   const [checkIns, setCheckIns] = useState<CheckInData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchCheckIns = useCallback(async (isInitialLoad = false) => {
-    if (!isInitialLoad) {
-      // For subsequent polls, don't show full loading state
-    } else {
+    if (isInitialLoad) {
       setIsLoading(true);
     }
     setError(null);
@@ -44,11 +41,9 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
       }
       const allData: any[] = await response.json();
       
-      // Filter for current session if one is active, otherwise show all (or none if that's preferred)
-      // For this app, we'll filter to only show current session's check-ins.
       const relevantData = currentSessionId 
         ? allData.filter(item => item.sessionId === currentSessionId) 
-        : []; // Show no checkins if no session is active/selected. Can be changed to allData if needed.
+        : []; 
 
       const processedData = relevantData.map(item => ({
         ...item,
@@ -57,7 +52,7 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
 
       setCheckIns(processedData);
 
-      if (isInitialLoad && currentSessionId) { // Only toast initial load if there's a session to load for
+      if (isInitialLoad && currentSessionId && currentSessionStatus === 'open') { 
          toast({
           title: "Attendance List Loaded",
           description: `Fetched ${processedData.length} check-ins for session ${currentSessionId}.`,
@@ -81,28 +76,31 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
         setIsLoading(false);
       }
     }
-  }, [toast, currentSessionId]); // Add currentSessionId as a dependency
+  }, [toast, currentSessionId, currentSessionStatus]); 
 
   useEffect(() => {
-    // Fetch initially only if there is a current session ID or it's the very first load.
-    // Subsequent calls inside setInterval will use the currentSessionId from the state.
     fetchCheckIns(true); 
 
-    const intervalId = setInterval(() => fetchCheckIns(false), POLLING_INTERVAL);
+    const intervalId = setInterval(() => {
+      // Only poll for check-ins if the session is open
+      if (currentSessionStatus === 'open') {
+        fetchCheckIns(false);
+      }
+    }, POLLING_INTERVAL);
 
-    return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [fetchCheckIns]); // fetchCheckIns itself depends on currentSessionId
+    return () => clearInterval(intervalId);
+  }, [fetchCheckIns, currentSessionStatus]); 
 
-  // This effect specifically handles re-fetching when the currentSessionId changes
-  // (e.g., instructor starts a new session).
   useEffect(() => {
-    if (currentSessionId !== undefined) { // Check if currentSessionId is set (could be null initially)
-      fetchCheckIns(true); // Treat as an initial load for the new session
+    // Re-fetch when currentSessionId changes (e.g., new session started or looking at old session)
+    // The `undefined` check is to avoid an initial double fetch if currentSessionId starts as null then becomes a specific ID.
+    if (currentSessionId !== undefined) { 
+      fetchCheckIns(true); 
     }
-  }, [currentSessionId]); // Re-run when currentSessionId changes
+  }, [currentSessionId]); // Only depend on currentSessionId for this effect
 
 
-  if (isLoading && !checkIns.length) { // Show skeleton only on true initial load with no data yet
+  if (isLoading && !checkIns.length) { 
     return (
       <Card className="flex-grow">
         <CardContent className="p-6 h-full">
@@ -111,7 +109,7 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
               <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
               <p className="text-lg">Loading attendance list...</p>
             </div>
-            {[...Array(3)].map((_, i) => ( // Reduced skeleton items
+            {[...Array(3)].map((_, i) => ( 
               <div key={i} className="flex items-center space-x-4 p-2 border rounded-md">
                 <Skeleton className="h-8 w-1/4" />
                 <Skeleton className="h-8 w-1/2" />
@@ -134,7 +132,7 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
             <AlertDescription>
               {error}
               <br />
-              Could not load check-in data. Retrying automatically...
+              Could not load check-in data. Retrying automatically if session is open...
             </AlertDescription>
              <Button onClick={() => fetchCheckIns(true)} variant="outline" size="sm" className="mt-2">
                 Retry Manually
@@ -142,11 +140,15 @@ export default function DashboardClient({ currentSessionId }: DashboardClientPro
           </Alert>
         )}
         <div className="flex-grow">
-         <AttendanceTable checkIns={checkIns} currentSessionId={currentSessionId} />
+         <AttendanceTable 
+            checkIns={checkIns} 
+            currentSessionId={currentSessionId} 
+            sessionStatus={currentSessionStatus} 
+          />
         </div>
          {!currentSessionId && !isLoading && !error && (
-            <div className="text-center text-muted-foreground p-4">
-                No active attendance session to display check-ins for. Start a session above.
+            <div className="text-center text-muted-foreground p-4 mt-4 border border-dashed rounded-md">
+                No active attendance session to display check-ins for. Start a session using the controls above.
             </div>
         )}
       </CardContent>

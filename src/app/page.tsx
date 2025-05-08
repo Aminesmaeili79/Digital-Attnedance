@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { AttendanceSession } from '@/types';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 
-const SESSION_POLL_INTERVAL = 5000; // 5 seconds for session status + checkin list
+const SESSION_POLL_INTERVAL = 5000; // 5 seconds for session status
 
 export default function InstructorDashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -23,17 +23,19 @@ export default function InstructorDashboardPage() {
   const { toast } = useToast();
 
   const [attendanceSession, setAttendanceSession] = useState<AttendanceSession | null>(null);
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
-  const [durationInput, setDurationInput] = useState(''); // Duration in minutes
-  const [isSubmittingSessionAction, setIsSubmittingSessionAction] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
+  const [durationInput, setDurationInput] = useState<string>(''); // Duration in minutes
+  const [isSubmittingSessionAction, setIsSubmittingSessionAction] = useState<boolean>(false);
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
 
   const fetchSessionStatus = useCallback(async () => {
-    // Only fetch if user is an instructor, to prevent calls before redirect or if role is wrong
     if (user?.role !== 'instructor' && !authLoading) return;
 
-    setIsSessionLoading(true);
+    // Only set full loading state on initial fetch, not for background polls
+    if (!attendanceSession) {
+        setIsSessionLoading(true);
+    }
     try {
       const response = await fetch('/api/attendance/status');
       if (!response.ok) {
@@ -43,19 +45,22 @@ export default function InstructorDashboardPage() {
       setAttendanceSession(sessionData);
     } catch (error) {
       console.error('Error fetching session status:', error);
-      toast({
-        title: 'Error Fetching Session',
-        description: (error as Error).message || 'Could not retrieve session status.',
-        variant: 'destructive',
-      });
+      if (!attendanceSession) { // Only toast if it's the initial load failing
+        toast({
+          title: 'Error Fetching Session',
+          description: (error as Error).message || 'Could not retrieve session status.',
+          variant: 'destructive',
+        });
+      }
     } finally {
+      // Always ensure loading is false after an attempt, even if it was a background poll
       setIsSessionLoading(false);
     }
-  }, [toast, user, authLoading]);
+  }, [toast, user, authLoading, attendanceSession]); // added attendanceSession to dep array
 
   useEffect(() => {
     if (!authLoading && user?.role === 'instructor') {
-      fetchSessionStatus(); // Initial fetch
+      fetchSessionStatus(); 
       const intervalId = setInterval(fetchSessionStatus, SESSION_POLL_INTERVAL);
       return () => clearInterval(intervalId);
     }
@@ -72,11 +77,10 @@ export default function InstructorDashboardPage() {
         } else {
           setTimeRemaining("Closing...");
           if (intervalId) clearInterval(intervalId);
-          // Session status will update via polling
         }
       };
-      updateTimer(); // Initial call
-      intervalId = setInterval(updateTimer, 1000); // Update every second
+      updateTimer(); 
+      intervalId = setInterval(updateTimer, 1000); 
     } else {
       setTimeRemaining(null);
     }
@@ -105,9 +109,9 @@ export default function InstructorDashboardPage() {
       if (!response.ok) {
         throw new Error(updatedSession.message || 'Failed to start session');
       }
-      setAttendanceSession(updatedSession);
+      setAttendanceSession(updatedSession); // This will trigger DashboardClient to update for the new session
       toast({ title: 'Session Started', description: `Attendance session is now open.${duration ? ` Closes in ${duration} minutes.` : ''}`, variant: 'default', className: 'bg-green-500 text-white dark:bg-green-600'});
-      setDurationInput(''); // Clear input
+      setDurationInput(''); 
     } catch (error) {
       toast({ title: 'Error Starting Session', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -123,7 +127,7 @@ export default function InstructorDashboardPage() {
       if (!response.ok) {
         throw new Error(updatedSession.message || 'Failed to end session');
       }
-      setAttendanceSession(updatedSession);
+      setAttendanceSession(updatedSession); // Session ID remains, status changes. DashboardClient will show this session's data.
       toast({ title: 'Session Ended', description: 'Attendance session has been manually closed.', variant: 'default' });
     } catch (error) {
       toast({ title: 'Error Ending Session', description: (error as Error).message, variant: 'destructive' });
@@ -132,7 +136,7 @@ export default function InstructorDashboardPage() {
     }
   };
 
-  // This condition will show spinner if auth is loading, or if user is not an instructor (AuthContext will redirect)
+
   if (authLoading || !user || user.role !== 'instructor') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
@@ -144,13 +148,13 @@ export default function InstructorDashboardPage() {
 
   const renderSessionStatus = () => {
     if (isSessionLoading && !attendanceSession) return <p className="text-muted-foreground flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading session status...</p>;
-    if (!attendanceSession || attendanceSession.status === 'not_started') {
+    if (!attendanceSession || attendanceSession.status === 'not_started' || !attendanceSession.sessionId) {
       return <p className="text-muted-foreground flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />No active session. Click "Start Attendance" to begin.</p>;
     }
     if (attendanceSession.status === 'open') {
       return (
         <div className="text-green-600 dark:text-green-400">
-          <p className="font-semibold flex items-center"><CheckCircle className="w-5 h-5 mr-2" />Session is OPEN.</p>
+          <p className="font-semibold flex items-center"><CheckCircle className="w-5 h-5 mr-2" />Session OPEN (ID: {attendanceSession.sessionId})</p>
           {attendanceSession.startTime && <p className="text-xs">Started: {format(parseISO(attendanceSession.startTime), "PPpp")}</p>}
           {timeRemaining && <p className="text-xs">Closes {timeRemaining}.</p>}
           {!attendanceSession.autoCloseTime && <p className="text-xs">Session running indefinitely (close manually).</p>}
@@ -160,9 +164,9 @@ export default function InstructorDashboardPage() {
     if (attendanceSession.status === 'closed_manual' || attendanceSession.status === 'closed_timeout') {
       return (
         <div className="text-red-600 dark:text-red-400">
-          <p className="font-semibold flex items-center"><StopCircle className="w-5 h-5 mr-2" />Session is CLOSED.</p>
+          <p className="font-semibold flex items-center"><StopCircle className="w-5 h-5 mr-2" />Session CLOSED (ID: {attendanceSession.sessionId})</p>
           {attendanceSession.endTime && <p className="text-xs">Closed: {format(parseISO(attendanceSession.endTime), "PPpp")}</p>}
-          {attendanceSession.status === 'closed_timeout' && <p className="text-xs">(Automatically closed due to timeout)</p>}
+          {attendanceSession.status === 'closed_timeout' && <p className="text-xs">(Automatically closed)</p>}
           {attendanceSession.status === 'closed_manual' && <p className="text-xs">(Manually closed)</p>}
         </div>
       );
@@ -192,7 +196,7 @@ export default function InstructorDashboardPage() {
       <Card className="mb-6 md:mb-8 shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl">Attendance Session Control</CardTitle>
-          <CardDescription>Manage the student check-in period.</CardDescription>
+          <CardDescription>Manage the student check-in period. Current Session ID: {attendanceSession?.sessionId || "N/A"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-3 border rounded-md bg-secondary/30">
@@ -221,7 +225,7 @@ export default function InstructorDashboardPage() {
                 className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
               >
                 {isSubmittingSessionAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
-                Start Attendance
+                Start New Session
               </Button>
             </div>
           )}
@@ -234,13 +238,16 @@ export default function InstructorDashboardPage() {
               className="w-full sm:w-auto"
             >
               {isSubmittingSessionAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <StopCircle className="mr-2 h-5 w-5" />}
-              End Session Manually
+              End Current Session
             </Button>
           )}
         </CardContent>
       </Card>
 
-      <DashboardClient currentSessionId={attendanceSession?.sessionId || null} />
+      <DashboardClient 
+        currentSessionId={attendanceSession?.sessionId || null} 
+        currentSessionStatus={attendanceSession?.status || null}
+      />
     </div>
   );
 }
