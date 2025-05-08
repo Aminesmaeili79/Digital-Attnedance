@@ -12,6 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import type { AttendanceSession, CheckInData } from '@/types';
 import { format, parseISO, formatDistanceToNowStrict } from 'date-fns';
 import { BluetoothScanner } from '@/components/bluetooth-scanner';
+import Image from 'next/image';
+import logociu from "@/assets/ciuAttendLogo.png";
+import appGif from "@/assets/splash_page.gif";
+
 
 const BLUETOOTH_DEVICE_ID_KEY = 'attendease_bluetooth_device_id';
 const STUDENT_LAST_CHECKIN_KEY_PREFIX = 'attendease-student-lastcheckin-';
@@ -214,10 +218,12 @@ export default function StudentDashboardPage() {
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="container mx-auto max-w-2xl">
         <header className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-primary flex items-center">
-            <BookOpen className="w-8 h-8 mr-2" />
-            AttendEase
+        <div className="flex items-center">
+          <Image src={logociu} alt="Logo" width={50} height={50} className="mr-2" />
+          <h1 className="text-xl md:text-2xl font-bold text-primary">
+            Student Portal
           </h1>
+        </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user.id}
@@ -229,8 +235,14 @@ export default function StudentDashboardPage() {
           </div>
         </header>
 
+        <span className="text-4xl md:text-5xl items-center mb-5 flex gap-4 text-primary bg-gradient-to-r from-blue-900 via-primary to-indigo-400 bg-clip-text text-transparent font-bold mb-4 md:mb-0 md:col-span-2 lg:col-span-1">
+            <Image className="h-14 w-14 " src={appGif} alt="" />
+            Welcome, <span>{user.id}</span>
+          </span>
         <Card className="mb-6 shadow-lg">
+          
           <CardHeader>
+            
             <CardTitle className="flex items-center text-xl">
               <Smartphone className="mr-2 h-5 w-5 text-primary" /> 
               Device Setup
