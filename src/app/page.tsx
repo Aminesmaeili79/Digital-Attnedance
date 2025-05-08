@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -18,14 +19,14 @@ const SESSION_POLL_INTERVAL = 5000; // 5 seconds for session status + checkin li
 
 export default function InstructorDashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
-  const router = useRouter(); // router might still be needed for other purposes, or can be removed if not.
+  const router = useRouter(); 
   const { toast } = useToast();
 
-  const [attendanceSession, setAttendanceSession(null);
-  const [isSessionLoading, setIsSessionLoading(true);
-  const [durationInput, setDurationInput(''); // Duration in minutes
-  const [isSubmittingSessionAction, setIsSubmittingSessionAction(false);
-  const [timeRemaining, setTimeRemaining(null);
+  const [attendanceSession, setAttendanceSession] = useState<AttendanceSession | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [durationInput, setDurationInput] = useState(''); // Duration in minutes
+  const [isSubmittingSessionAction, setIsSubmittingSessionAction] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
 
   const fetchSessionStatus = useCallback(async () => {
@@ -60,12 +61,6 @@ export default function InstructorDashboardPage() {
     }
   }, [fetchSessionStatus, authLoading, user]);
   
-  // Redundant redirection useEffect removed, AuthContext handles this.
-  // useEffect(() => {
-  //   if (!authLoading && (!user || user.role !== 'instructor')) {
-  //     router.replace('/login');
-  //   }
-  // }, [user, authLoading, router]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;

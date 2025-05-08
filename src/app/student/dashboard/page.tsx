@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,14 +16,22 @@ import { formatDistanceToNowStrict, parseISO } from 'date-fns';
 const BLUETOOTH_DEVICE_ID_KEY = 'attendease_bluetooth_device_id';
 const SESSION_POLL_INTERVAL = 5000; // 5 seconds
 
+interface LastCheckInStatus {
+  success: boolean;
+  message: string;
+  sessionId: string | null;
+}
+
 export default function StudentDashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
-  const router = useRouter(); // router might still be needed for other purposes, or can be removed if not.
+  const router = useRouter(); 
   const { toast } = useToast();
-  const [deviceId, setDeviceId(null);
-  const [attendanceSession, setAttendanceSession(true);
-  const [isCheckingIn, setIsCheckingIn(null;
-  const [timeRemaining, setTimeRemaining<string | null} | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [attendanceSession, setAttendanceSession] = useState<AttendanceSession | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [lastCheckInStatus, setLastCheckInStatus] = useState<LastCheckInStatus | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -36,6 +45,7 @@ export default function StudentDashboardPage() {
   }, []);
 
   const fetchSessionStatus = useCallback(async () => {
+    setIsSessionLoading(true); // Set loading true at the beginning of fetch
     try {
       const response = await fetch('/api/attendance/status');
       if (!response.ok) {
@@ -59,12 +69,6 @@ export default function StudentDashboardPage() {
     }
   }, [fetchSessionStatus, authLoading, user]);
 
-  // Redundant redirection useEffect removed, AuthContext handles this.
-  // useEffect(() => {
-  //   if (!authLoading && (!user || user.role !== 'student')) {
-  //     router.replace('/login');
-  //   }
-  // }, [user, authLoading, router]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
