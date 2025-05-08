@@ -4,13 +4,14 @@ import { GeistSans } from 'geist/font/sans';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
+import { AuthProvider } from '@/context/auth-context';
 
 const geistSans = GeistSans;
 // const geistMono = GeistMono; // Removed
 
 export const metadata: Metadata = {
-  title: 'AttendEase Dashboard',
-  description: 'Instructor dashboard for the AttendEase attendance system.',
+  title: 'AttendEase System',
+  description: 'AttendEase attendance system for instructors and students.',
 };
 
 export default function RootLayout({
@@ -27,8 +28,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main>{children}</main>
-          <Toaster />
+          <AuthProvider>
+            <main className="h-full">{children}</main>
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
