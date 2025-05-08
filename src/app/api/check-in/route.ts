@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/api-store';
 import type { CheckInData } from '@/types';
 
@@ -9,7 +8,7 @@ export async function POST(request: NextRequest) {
     const { studentId, bluetoothMacAddress } = body as { studentId: string; bluetoothMacAddress: string };
 
     if (!studentId || !bluetoothMacAddress) {
-      return NextResponse.json({ message: 'Student ID and Bluetooth MAC address are required.' }, { status: 400 });
+      return NextResponse.json({ message: 'Student ID and Bluetooth device ID are required.' }, { status: 400 });
     }
 
     const session = store.currentAttendanceSession;
@@ -26,17 +25,8 @@ export async function POST(request: NextRequest) {
     if (existingCheckIn) {
       return NextResponse.json({ message: 'This device has already checked in for the current session.' }, { status: 409 });
     }
-    
-    // Check if student has already checked in with a different device for the current session
-    // This rule might be too strict or configurable in a real app, for now we allow one student check-in per session regardless of device
-    // const studentAlreadyCheckedIn = store.checkInsData.find(
-    //   (ci) => ci.sessionId === session.sessionId && ci.studentId === studentId
-    // );
-    // if (studentAlreadyCheckedIn) {
-    //   return NextResponse.json({ message: 'Student has already checked in for this session (possibly with another device).' }, { status: 409 });
-    // }
 
-
+    // Create new check-in record with the real Bluetooth device ID
     const newCheckIn: CheckInData = {
       id: `checkin-${store.nextCheckInIdCounter++}`,
       studentId,
@@ -46,6 +36,7 @@ export async function POST(request: NextRequest) {
     };
 
     store.checkInsData.push(newCheckIn);
+
     console.log(`Student ${studentId} checked in with device ${bluetoothMacAddress} for session ${session.sessionId}`);
 
     return NextResponse.json({ message: 'Check-in successful!', checkIn: newCheckIn }, { status: 201 });
