@@ -184,242 +184,249 @@ export default function InstructorDashboardPage() {
       setManualStudentId('');
       // DashboardClient will pick up the new check-in on its next poll, which will update activeSessionCheckIns
     } catch (error) {
-      toast({ title: 'Manual Check-in Failed', description: (error as Error).message, variant: 'destructive' });
+      toast({ title: 'Error Manually Checking In', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setIsSubmittingManualCheckIn(false);
     }
   };
 
-  const getClassNameById = (classId: string | null | undefined): string => {
-    if (!classId) return "Unknown Class";
-    const foundClass = classes.find(c => c.id === classId);
-    return foundClass ? `${foundClass.courseName} - ${foundClass.sessionNumber}` : "Unknown Class";
-  };
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== 'instructor')) {
+      router.replace('/login');
+    }
+  }, [user, authLoading, router]);
 
+  const selectedCourseDetails = selectedClassId ? classes.find(c => c.id === selectedClassId) : null;
+  const attendanceCountForSelectedClass = activeSessionCheckIns.filter(ci => ci.sessionId === attendanceSession?.sessionId).length;
 
-  if (authLoading || !user || user.role !== 'instructor') {
+  if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
-        <p className="ml-4 mt-4 text-lg text-muted-foreground">Loading Dashboard...</p>
+        <p className="mt-4 text-lg text-muted-foreground">Loading Dashboard...</p>
       </div>
     );
   }
-
-  const renderSessionStatus = () => {
-    if (isSessionLoading && !attendanceSession) return <p className="text-muted-foreground flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading session status...</p>;
-    if (!attendanceSession || attendanceSession.status === 'not_started' || !attendanceSession.sessionId) {
-      return <p className="text-muted-foreground flex items-center"><Info className="w-5 h-5 mr-2 text-primary" />No active session. Select a class and click "Start Session" to begin.</p>;
-    }
-    
-    const sessionClassName = getClassNameById(attendanceSession.classId);
-
-    if (attendanceSession.status === 'open') {
-      return (
-        <div className="text-green-600 dark:text-green-400">
-          <p className="font-semibold flex items-center"><CheckCircle className="w-5 h-5 mr-2" />Session OPEN for {sessionClassName} (ID: {attendanceSession.sessionId})</p>
-          {attendanceSession.startTime && <p className="text-xs">Started: {format(parseISO(attendanceSession.startTime), "PPpp")}</p>}
-          {timeRemaining && <p className="text-xs">Closes {timeRemaining}.</p>}
-          {!attendanceSession.autoCloseTime && <p className="text-xs">Session running indefinitely (close manually).</p>}
-        </div>
-      );
-    }
-    if (attendanceSession.status === 'closed_manual' || attendanceSession.status === 'closed_timeout') {
-      return (
-        <div className="text-red-600 dark:text-red-400">
-          <p className="font-semibold flex items-center"><StopCircle className="w-5 h-5 mr-2" />Session CLOSED for {sessionClassName} (ID: {attendanceSession.sessionId})</p>
-          {attendanceSession.endTime && <p className="text-xs">Closed: {format(parseISO(attendanceSession.endTime), "PPpp")}</p>}
-          {attendanceSession.status === 'closed_timeout' && <p className="text-xs">(Automatically closed)</p>}
-          {attendanceSession.status === 'closed_manual' && <p className="text-xs">(Manually closed)</p>}
-        </div>
-      );
-    }
-    return <p className="text-muted-foreground">Session status unknown.</p>;
-  };
+  if (!user) return null;
 
 
   return (
-    <div className="min-h-screen p-4 md:p-6 flex flex-col bg-secondary/30">
-      <header className="mb-6 md:mb-8 flex flex-wrap justify-between items-center gap-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-primary flex items-center">
-          <ClipboardList className="w-8 h-8 md:w-10 md:h-10 mr-2 md:mr-3" />
-          AttendEase Dashboard
-        </h1>
-        <div className="flex items-center space-x-2 md:space-x-4">
-          <span className="text-sm text-muted-foreground hidden sm:inline">
-            Welcome, {user.id} (Instructor)
-          </span>
+    <div className="flex h-screen bg-background">
+      {/* Sidebar for Class Selection */}
+      <aside className="w-80 border-r border-border p-4 flex flex-col space-y-4 bg-card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-primary flex items-center">
+            <ClipboardList className="mr-2" /> AttendEase
+          </h2>
           <ModeToggle />
-          <Button variant="outline" onClick={logout} size="sm">
-            <LogOut className="mr-2 h-4 w-4" /> Logout
-          </Button>
         </div>
-      </header>
+        <div className="flex items-center justify-between text-sm">
+            <span>Welcome, {user.id}!</span>
+            <Button variant="outline" size="sm" onClick={logout}>
+              <LogOut className="mr-2 h-4 w-4" /> Logout
+            </Button>
+        </div>
+        <Separator />
+        <h3 className="text-lg font-medium text-foreground">Your Classes</h3>
+        <ScrollArea className="h-[calc(100vh-250px)]">
+            <div className="grid grid-cols-1 gap-3">
+              {classes.map((cls) => {
+                  const isSelected = selectedClassId === cls.id;
+                  const isPastClass = isPast(parseISO(cls.scheduledTime));
+                  const isUpcoming = isFuture(parseISO(cls.scheduledTime));
+                  
+                  let statusBadge: React.ReactNode = null;
+                  if (attendanceSession?.classId === cls.id && attendanceSession.status === 'open') {
+                    statusBadge = <Badge variant="default" className="ml-auto text-xs bg-green-500 hover:bg-green-600">Session Active</Badge>;
+                  } else if (isPastClass && !(attendanceSession?.classId === cls.id && (attendanceSession.status === 'closed_manual' || attendanceSession.status === 'closed_timeout'))) {
+                    statusBadge = <Badge variant="outline" className="ml-auto text-xs">Completed</Badge>;
+                  } else if (isUpcoming) {
+                    statusBadge = <Badge variant="secondary" className="ml-auto text-xs">Upcoming</Badge>;
+                  } else if (attendanceSession?.classId === cls.id && (attendanceSession.status === 'closed_manual' || attendanceSession.status === 'closed_timeout')) {
+                    statusBadge = <Badge variant="destructive" className="ml-auto text-xs">Session Ended</Badge>;
+                  }
 
-      {/* Classes Section */}
-      <section className="mb-6 md:mb-8">
-        <h2 className="text-2xl font-semibold mb-4 text-foreground flex items-center">
-          <ListChecks className="w-7 h-7 mr-2 text-primary" /> Scheduled Classes
-        </h2>
-        {classes.length === 0 ? (
-          <p className="text-muted-foreground">No classes scheduled.</p>
-        ) : (
-          <ScrollArea className="h-[250px] md:h-[300px] pr-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {classes.map((courseClass) => {
-                const isSelected = selectedClassId === courseClass.id;
-                const isActiveSessionForThisClass = attendanceSession?.status === 'open' && attendanceSession.classId === courseClass.id;
-                const attendanceCount = isActiveSessionForThisClass ? activeSessionCheckIns.length : 0;
-                const timeStatus = isPast(parseISO(courseClass.scheduledTime)) ? "Past" : isFuture(parseISO(courseClass.scheduledTime)) ? "Upcoming" : "Now";
-
-                return (
-                  <Card 
-                    key={courseClass.id} 
-                    className={`shadow-md hover:shadow-lg transition-shadow cursor-pointer ${isSelected ? 'border-2 border-primary ring-2 ring-primary/50' : 'border-border'}`}
-                    onClick={() => setSelectedClassId(courseClass.id)}
-                  >
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center justify-between">
-                        <span className="truncate flex items-center"> 
-                           <BookMarked className={`w-5 h-5 mr-2 ${isSelected ? 'text-primary': 'text-muted-foreground'}`} />
-                          {courseClass.courseName}
-                        </span>
-                        {isSelected && <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 ml-2" />}
-                      </CardTitle>
-                      <CardDescription>{courseClass.sessionNumber}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1.5 pb-3">
-                       <p className="flex items-center"><CalendarDays className="w-4 h-4 mr-2 text-muted-foreground" /> {format(parseISO(courseClass.scheduledTime), "MMM d, yyyy h:mm a")} <Badge variant={timeStatus === 'Past' ? 'outline' : timeStatus === 'Upcoming' ? 'secondary' : 'default'} className="ml-auto text-xs">{timeStatus}</Badge></p>
-                      <p className="flex items-center"><Home className="w-4 h-4 mr-2 text-muted-foreground" /> {courseClass.classroom}</p>
-                      <p className="flex items-center"><Users className="w-4 h-4 mr-2 text-muted-foreground" /> 
-                        Attendance: {attendanceCount} / {courseClass.totalStudents}
-                      </p>
-                    </CardContent>
-                    <CardFooter className="p-3 pt-0">
-                       <Button 
-                        variant={isSelected ? "default" : "outline"} 
-                        size="sm" 
-                        className="w-full"
-                        onClick={(e) => { e.stopPropagation(); setSelectedClassId(courseClass.id); }}
-                      >
-                        {isSelected ? <Check className="mr-2 h-4 w-4"/> : null}
-                        {isSelected ? 'Selected' : 'Select Class'}
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                );
+                  return (
+                    <Card 
+                        key={cls.id} 
+                        className={`shadow-md transition-all hover:shadow-lg cursor-pointer ${isSelected ? 'border-primary ring-2 ring-primary' : 'border-border'} ${isPastClass && !isSelected ? 'opacity-70' : ''}`}
+                        onClick={() => {
+                            setSelectedClassId(cls.id);
+                            // If a session is open for another class, don't automatically switch view, let instructor handle it.
+                            // If a session is open for THIS class, the DashboardClient will show its checkins.
+                            // If no session is open, or a session is open for a DIFFERENT class, DashboardClient will show "No active session for this class" or similar.
+                        }}
+                    >
+                      <CardHeader className="pb-2 pt-3 px-3">
+                        <CardTitle className="text-sm font-semibold truncate flex items-center">
+                            <BookMarked className="w-4 h-4 mr-2 text-primary/80" />
+                            {cls.courseName}
+                            {statusBadge}
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                            {cls.sessionNumber} - {cls.classroom}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-xs space-y-1 px-3 pb-3">
+                        <div className="flex items-center">
+                            <CalendarDays className="w-3 h-3 mr-1.5 text-muted-foreground" />
+                            Scheduled: {format(parseISO(cls.scheduledTime), 'MMM d, HH:mm')}
+                        </div>
+                         <div className="flex items-center">
+                            <Users className="w-3 h-3 mr-1.5 text-muted-foreground" />
+                            {
+                                attendanceSession?.classId === cls.id && (attendanceSession.status === 'open' || attendanceSession.status === 'closed_manual' || attendanceSession.status === 'closed_timeout')
+                                ? `${activeSessionCheckIns.filter(ci => ci.sessionId === attendanceSession.sessionId).length} / ${cls.totalStudents} Students`
+                                : `Total: ${cls.totalStudents} Students`
+                            }
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
               })}
             </div>
-          </ScrollArea>
-        )}
-      </section>
+        </ScrollArea>
+      </aside>
 
-
-      <div className="grid md:grid-cols-3 gap-6 md:gap-8 mb-6 md:mb-8">
-        <Card className="md:col-span-2 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl">Attendance Session Control</CardTitle>
-            <CardDescription>
-              Manage student check-in for {selectedClassId ? `class: ${getClassNameById(selectedClassId)}` : "selected class"}.
-              Session ID: {attendanceSession?.sessionId || "N/A"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-3 border rounded-md bg-card">
-              {renderSessionStatus()}
-            </div>
-            
-            {attendanceSession?.status !== 'open' && (
-              <div className="flex flex-col sm:flex-row gap-4 items-end pt-2">
-                <div className="flex-grow">
-                  <Label htmlFor="duration" className="flex items-center mb-1 text-sm">
-                    <Timer className="w-4 h-4 mr-1 text-muted-foreground" /> Duration (minutes, optional)
-                  </Label>
-                  <Input 
-                    id="duration" 
-                    type="number" 
-                    placeholder="e.g., 15 (blank for manual close)" 
-                    value={durationInput} 
-                    onChange={(e) => setDurationInput(e.target.value)} 
-                    className="text-base"
-                    disabled={isSubmittingSessionAction || !selectedClassId || attendanceSession?.status === 'open'}
-                  />
-                </div>
-                <Button 
-                  onClick={handleStartSession} 
-                  disabled={isSubmittingSessionAction || !selectedClassId || attendanceSession?.status === 'open'}
-                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {isSubmittingSessionAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
-                  Start Session
-                </Button>
-              </div>
-            )}
-             {!selectedClassId && attendanceSession?.status !== 'open' && (
-                <p className="text-sm text-amber-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-1"/> Please select a class to start a new session.</p>
-            )}
-
-            {attendanceSession?.status === 'open' && (
-              <Button 
-                onClick={handleEndSession} 
-                disabled={isSubmittingSessionAction}
-                variant="destructive"
-                className="w-full sm:w-auto mt-2"
-              >
-                {isSubmittingSessionAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <StopCircle className="mr-2 h-5 w-5" />}
-                End Current Session
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 md:p-6 flex flex-col space-y-4 overflow-y-auto">
+        {/* Session Control & Info */}
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl">Manual Student Check-in</CardTitle>
-            <CardDescription>Manually record attendance for a student.</CardDescription>
+            <CardTitle className="flex items-center text-xl">
+                {selectedCourseDetails ? (
+                    <>
+                        <ListChecks className="mr-2 h-6 w-6 text-primary" /> 
+                        Attendance: {selectedCourseDetails.courseName} ({selectedCourseDetails.sessionNumber})
+                    </>
+                ) : (
+                    <>
+                        <Info className="mr-2 h-6 w-6 text-muted-foreground" />
+                        Select a Class
+                    </>
+                )}
+            </CardTitle>
+            <CardDescription>
+                {selectedCourseDetails ? 
+                    `Manage attendance for ${selectedCourseDetails.classroom}. Scheduled: ${format(parseISO(selectedCourseDetails.scheduledTime), 'PPpp')}` : 
+                    "Please select a class from the left panel to manage its attendance session."
+                }
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {attendanceSession?.status === 'open' ? (
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="flex-grow">
-                  <Label htmlFor="manualStudentId" className="flex items-center mb-1 text-sm">
-                    <UserPlus className="w-4 h-4 mr-1 text-muted-foreground" /> Student ID
-                  </Label>
-                  <Input
-                    id="manualStudentId"
-                    type="text"
-                    placeholder="Enter Student ID"
-                    value={manualStudentId}
-                    onChange={(e) => setManualStudentId(e.target.value)}
-                    className="text-base"
-                    disabled={isSubmittingManualCheckIn}
-                  />
+          {selectedClassId && (
+            <CardContent className="space-y-4">
+              {isSessionLoading && !attendanceSession ? (
+                <div className="flex items-center p-3 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading session details...
                 </div>
-                <Button
-                  onClick={handleManualCheckInStudent}
-                  disabled={isSubmittingManualCheckIn || !manualStudentId.trim()}
-                  className="w-full sm:w-auto"
-                >
-                  {isSubmittingManualCheckIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
-                  Check-in
-                </Button>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm flex items-center">
-                <Info className="w-4 h-4 mr-2 text-primary" />
-                Manual check-in available during an open session.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              ) : attendanceSession?.status === 'open' ? (
+                <div className="p-3 border rounded-md bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <p className="font-semibold text-green-700 dark:text-green-400 flex items-center">
+                            <PlayCircle className="w-5 h-5 mr-2" /> Session OPEN (ID: {attendanceSession.sessionId})
+                            </p>
+                            {attendanceSession.autoCloseTime && timeRemaining ? (
+                                <p className="text-xs text-muted-foreground mt-1 flex items-center"><Timer className="w-3 h-3 mr-1"/> {timeRemaining}</p>
+                            ) : !attendanceSession.autoCloseTime ? (
+                                <p className="text-xs text-muted-foreground mt-1">Manual close required.</p>
+                            ) : null}
+                             <p className="text-xs text-muted-foreground mt-0.5">For: {classes.find(c=>c.id === attendanceSession.classId)?.courseName || 'Unknown Class'}</p>
+                        </div>
+                        <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={handleEndSession} 
+                            disabled={isSubmittingSessionAction}
+                        >
+                            {isSubmittingSessionAction ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <StopCircle className="h-4 w-4 mr-2"/>}
+                            End Session
+                        </Button>
+                    </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="duration" className="text-sm font-medium">Session Duration (minutes, optional)</Label>
+                    <Input
+                        id="duration"
+                        type="number"
+                        placeholder="e.g., 45 (leave blank for manual end)"
+                        value={durationInput}
+                        onChange={(e) => setDurationInput(e.target.value)}
+                        className="mt-1"
+                        disabled={isSubmittingSessionAction || attendanceSession?.status === 'open' || !selectedClassId}
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleStartSession} 
+                    className="self-end py-2.5 bg-primary hover:bg-primary/90"
+                    disabled={isSubmittingSessionAction || attendanceSession?.status === 'open' || !selectedClassId}
+                  >
+                    {isSubmittingSessionAction ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <PlayCircle className="h-5 w-5 mr-2"/>}
+                    Start Session
+                  </Button>
+                </div>
+              )}
 
-      <DashboardClient 
-        currentSessionId={attendanceSession?.sessionId || null} 
-        currentSessionStatus={attendanceSession?.status || null}
-        currentSessionClassId={attendanceSession?.classId || null}
-        onCheckInsUpdate={(updatedCheckIns) => setActiveSessionCheckIns(updatedCheckIns)}
-      />
+              {attendanceSession?.status !== 'not_started' && (
+                <Badge variant={attendanceSession?.status === 'open' ? 'default' : attendanceSession?.status === 'closed_manual' || attendanceSession?.status === 'closed_timeout' ? 'destructive' : 'secondary'} className="capitalize">
+                  Session Status: {attendanceSession?.status.replace('_', ' ') || 'Not Started'}
+                  {attendanceSession?.status === 'open' && attendanceSession.classId !== selectedClassId && " (For a different class)"}
+                </Badge>
+              )}
+
+
+              {/* Manual Student Check-in */}
+              {attendanceSession?.status === 'open' && attendanceSession.classId === selectedClassId && (
+                <div className="pt-4 border-t">
+                    <Label htmlFor="manualStudentId" className="text-sm font-medium">Manual Student Check-in</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                        <Input
+                        id="manualStudentId"
+                        type="text"
+                        placeholder="Enter Student ID"
+                        value={manualStudentId}
+                        onChange={(e) => setManualStudentId(e.target.value)}
+                        disabled={isSubmittingManualCheckIn}
+                        />
+                        <Button 
+                        onClick={handleManualCheckInStudent} 
+                        variant="outline"
+                        disabled={isSubmittingManualCheckIn || !manualStudentId.trim()}
+                        >
+                        {isSubmittingManualCheckIn ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <UserPlus className="h-4 w-4 mr-2"/>}
+                        Add Student
+                        </Button>
+                    </div>
+                </div>
+              )}
+
+            </CardContent>
+          )}
+           {selectedClassId && attendanceSession && attendanceSession.status !== 'open' && attendanceSession.classId === selectedClassId && (
+            <CardFooter>
+                <p className="text-sm text-muted-foreground">
+                    This session ({attendanceSession.sessionId}) is currently {attendanceSession.status.replace('_', ' ')}.
+                    {attendanceSession.endTime && ` Ended at ${format(parseISO(attendanceSession.endTime), 'PPpp')}.`}
+                </p>
+            </CardFooter>
+           )}
+           {!selectedClassId && (
+             <CardContent>
+                <p className="text-center text-muted-foreground py-4">Select a class from the sidebar to view and manage attendance.</p>
+             </CardContent>
+           )}
+        </Card>
+        
+        {/* Attendance List */}
+        <DashboardClient 
+          currentSessionId={attendanceSession?.classId === selectedClassId ? attendanceSession?.sessionId : null} 
+          currentSessionStatus={attendanceSession?.classId === selectedClassId ? attendanceSession?.status : 'not_started'}
+          currentSessionClassId={selectedClassId}
+          onCheckInsUpdate={setActiveSessionCheckIns}
+        />
+      </main>
     </div>
   );
 }
