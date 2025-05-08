@@ -17,16 +17,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Attendance session is not open or not available.' }, { status: 403 });
     }
     
-    // Check if this device has already checked in for the current session
-    const existingCheckIn = store.checkInsData.find(
-      (ci) => ci.sessionId === session.sessionId && ci.bluetoothMacAddress === bluetoothMacAddress
+    // Check if this STUDENT has already checked in for the current session
+    // Changed from checking device ID to checking student ID
+    const existingStudentCheckIn = store.checkInsData.find(
+      (ci) => ci.sessionId === session.sessionId && ci.studentId === studentId
     );
 
-    if (existingCheckIn) {
-      return NextResponse.json({ message: 'This device has already checked in for the current session.' }, { status: 409 });
+    if (existingStudentCheckIn) {
+      return NextResponse.json({ message: 'You have already checked in for this session.' }, { status: 409 });
     }
 
-    // Create new check-in record with the real Bluetooth device ID
+    // Create new check-in record
     const newCheckIn: CheckInData = {
       id: `checkin-${store.nextCheckInIdCounter++}`,
       studentId,
