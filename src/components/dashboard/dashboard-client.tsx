@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
 const POLLING_INTERVAL = 5000; // 5 seconds
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const API_ENDPOINT = '/api/list'; // Use relative path for API calls
 
 // Generate a simple client-side ID if API doesn't provide one, for React keys
 let idCounter = 0;
@@ -33,7 +33,7 @@ export default function DashboardClient() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/list`);
+      const response = await fetch(API_ENDPOINT);
       if (!response.ok) {
         const errorData = await response.text();
         throw new Error(`API Error: ${response.status} ${response.statusText}. ${errorData}`);
@@ -114,7 +114,7 @@ export default function DashboardClient() {
             <AlertDescription>
               {error}
               <br />
-              Please ensure the local API server is running and accessible.
+              Please ensure the API server is running and accessible.
               Retrying automatically...
             </AlertDescription>
              <Button onClick={() => fetchCheckIns(true)} variant="outline" size="sm" className="mt-2">
