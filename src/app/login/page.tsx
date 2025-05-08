@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, type FormEvent, useEffect } from 'react';
@@ -16,7 +17,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'instructor' | 'student'>('student');
   const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, user, isLoading } = useAuth();
   const router = useRouter();
 
