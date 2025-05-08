@@ -77,7 +77,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
           </div>
-          <CardTitle className="text-3xl font-bold text-primary">AttendEase Login</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary">CIU Attend Login</CardTitle>
           <CardDescription className="text-muted-foreground">Sign in to access your dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,6 +89,26 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+                        <div className="space-y-2">
+              <Label className="flex items-center text-sm">
+                <Users className="inline-block w-4 h-4 mr-2 text-primary/80" /> Role
+              </Label>
+              <RadioGroup
+                value={role}
+                onValueChange={(value) => setRole(value as 'instructor' | 'student')}
+                className="flex space-x-4 pt-1"
+                aria-label="Select your role"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="student" id="role-student" />
+                  <Label htmlFor="role-student" className="font-normal cursor-pointer">Student</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="instructor" id="role-instructor" />
+                  <Label htmlFor="role-instructor" className="font-normal cursor-pointer">Instructor</Label>
+                </div>
+              </RadioGroup>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="userId" className="flex items-center text-sm">
                 <User className="inline-block w-4 h-4 mr-2 text-primary/80" /> User ID
@@ -121,26 +141,7 @@ export default function LoginPage() {
               />
               <p id="password-hint" className="text-xs text-muted-foreground pl-1">Password: password</p>
             </div>
-            <div className="space-y-2">
-              <Label className="flex items-center text-sm">
-                <Users className="inline-block w-4 h-4 mr-2 text-primary/80" /> Role
-              </Label>
-              <RadioGroup
-                value={role}
-                onValueChange={(value) => setRole(value as 'instructor' | 'student')}
-                className="flex space-x-4 pt-1"
-                aria-label="Select your role"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="student" id="role-student" />
-                  <Label htmlFor="role-student" className="font-normal cursor-pointer">Student</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="instructor" id="role-instructor" />
-                  <Label htmlFor="role-instructor" className="font-normal cursor-pointer">Instructor</Label>
-                </div>
-              </RadioGroup>
-            </div>
+
             <Button type="submit" className="w-full text-lg py-3" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />

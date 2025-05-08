@@ -14,7 +14,7 @@ body {
     --card-foreground: 210 25% 25%;
     --popover: 0 0% 100%;
     --popover-foreground: 210 25% 25%;
-    --primary: 207 67% 53%; /* #3498db calming blue */
+    --primary: 249 54% 57%; /* #3498db calming blue */
     --primary-foreground: 0 0% 100%; /* white */
     --secondary: 210 15% 90%; /* A slightly darker gray than background */
     --secondary-foreground: 210 25% 25%;
@@ -49,7 +49,7 @@ body {
     --card-foreground: 210 17% 90%;
     --popover: 210 25% 20%;
     --popover-foreground: 210 17% 90%;
-    --primary: 207 67% 53%; /* Blue remains prominent */
+    --primary: 249 64% 57%; /* Blue remains prominent */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 25% 25%;
     --secondary-foreground: 210 17% 90%;
