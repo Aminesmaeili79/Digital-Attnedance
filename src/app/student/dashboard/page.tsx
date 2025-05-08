@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -18,14 +17,12 @@ const SESSION_POLL_INTERVAL = 5000; // 5 seconds
 
 export default function StudentDashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); // router might still be needed for other purposes, or can be removed if not.
   const { toast } = useToast();
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [attendanceSession, setAttendanceSession] = useState<AttendanceSession | null>(null);
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
-  const [isCheckingIn, setIsCheckingIn] = useState(false);
-  const [lastCheckInStatus, setLastCheckInStatus] = useState<{success: boolean, message: string, sessionId: string | null} | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [deviceId, setDeviceId(null);
+  const [attendanceSession, setAttendanceSession(true);
+  const [isCheckingIn, setIsCheckingIn(null;
+  const [timeRemaining, setTimeRemaining<string | null} | null>(null);
 
 
   useEffect(() => {
@@ -55,16 +52,19 @@ export default function StudentDashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchSessionStatus();
-    const intervalId = setInterval(fetchSessionStatus, SESSION_POLL_INTERVAL);
-    return () => clearInterval(intervalId);
-  }, [fetchSessionStatus]);
-
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'student')) {
-      router.replace('/login');
+    if (!authLoading && user?.role === 'student') { // Only poll if user is a student and auth is loaded
+      fetchSessionStatus();
+      const intervalId = setInterval(fetchSessionStatus, SESSION_POLL_INTERVAL);
+      return () => clearInterval(intervalId);
     }
-  }, [user, authLoading, router]);
+  }, [fetchSessionStatus, authLoading, user]);
+
+  // Redundant redirection useEffect removed, AuthContext handles this.
+  // useEffect(() => {
+  //   if (!authLoading && (!user || user.role !== 'student')) {
+  //     router.replace('/login');
+  //   }
+  // }, [user, authLoading, router]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
@@ -146,7 +146,9 @@ export default function StudentDashboardPage() {
     }
   };
   
-  if (authLoading || !user || user.role !== 'student' || isSessionLoading) {
+  // This condition will show spinner if auth is loading, or if user is not a student (AuthContext will redirect),
+  // or if session data is still loading for the student.
+  if (authLoading || !user || user.role !== 'student' || (isSessionLoading && !attendanceSession) ) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />

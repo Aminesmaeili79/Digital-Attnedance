@@ -25,34 +25,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    let foundUser: User | null = null;
     try {
-      const storedUser = localStorage.getItem('authUser');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      const storedUserString = localStorage.getItem('authUser');
+      if (storedUserString) {
+        const parsedUser = JSON.parse(storedUserString);
+        // Validate the parsed user object
+        if (parsedUser && typeof parsedUser.id === 'string' &&
+            (parsedUser.role === 'instructor' || parsedUser.role === 'student')) {
+          foundUser = parsedUser as User;
+        } else {
+          console.warn('Invalid user data in localStorage. Clearing authUser.');
+          localStorage.removeItem('authUser');
+        }
       }
     } catch (error) {
-      console.error("Failed to parse authUser from localStorage", error);
+      console.error("Error processing authUser from localStorage:", error);
       localStorage.removeItem('authUser'); // Clear corrupted data
     }
-    setIsLoading(false);
-  }, []);
+    
+    setUser(foundUser); // Set user (or null if not found/invalid)
+    setIsLoading(false); // Indicate loading is complete
+  }, []); // Empty dependency array ensures this runs once on mount
 
   const login = useCallback((id: string, role: 'instructor' | 'student') => {
     const userData = { id, role };
     localStorage.setItem('authUser', JSON.stringify(userData));
     setUser(userData);
-    if (role === 'instructor') {
-      router.push('/');
-    } else {
-      router.push('/student/dashboard');
-    }
-  }, [router]);
+    // Redirection will be handled by the useEffect below
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem('authUser');
     setUser(null);
-    router.push('/login');
-  }, [router]);
+    // Redirection will be handled by the useEffect below
+  }, []);
 
   // Effect to handle route protection and redirection
   useEffect(() => {
@@ -63,20 +70,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!user && !isPublicPath) {
       // If no user and not on a public path, redirect to login
-      router.push('/login');
+      router.replace('/login');
     } else if (user && isPublicPath) {
       // If user exists and is on a public path (e.g. login page), redirect to their dashboard
       if (user.role === 'instructor') {
-        router.push('/');
+        router.replace('/');
       } else {
-        router.push('/student/dashboard');
+        router.replace('/student/dashboard');
       }
     } else if (user && pathname === '/' && user.role === 'student') {
         // If student tries to access instructor dashboard
-        router.push('/student/dashboard');
+        router.replace('/student/dashboard');
     } else if (user && pathname === '/student/dashboard' && user.role === 'instructor') {
         // If instructor tries to access student dashboard
-        router.push('/');
+        router.replace('/');
     }
 
   }, [user, isLoading, pathname, router]);
@@ -96,3 +103,4 @@ export function useAuth() {
   }
   return context;
 }
+

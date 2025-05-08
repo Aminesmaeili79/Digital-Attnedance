@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, type FormEvent, useEffect } from 'react';
@@ -17,20 +16,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'instructor' | 'student'>('student');
   const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting(false);
   const { login, user, isLoading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      // If user is already logged in, redirect them
-      if (user.role === 'instructor') {
-        router.replace('/');
-      } else {
-        router.replace('/student/dashboard');
-      }
-    }
-  }, [user, isLoading, router]);
+  // Redundant redirection useEffect removed, AuthContext handles this.
+  // useEffect(() => {
+  //   if (!isLoading && user) {
+  //     // If user is already logged in, redirect them
+  //     if (user.role === 'instructor') {
+  //       router.replace('/');
+  //     } else {
+  //       router.replace('/student/dashboard');
+  //     }
+  //   }
+  // }, [user, isLoading, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,6 +43,7 @@ export default function LoginPage() {
     if (role === 'instructor') {
       if (userId === 'instructor' && password === 'password') {
         login(userId, role);
+        // No direct router.push here, AuthContext will redirect based on new user state
       } else {
         setError('Invalid instructor ID or password.');
       }
@@ -50,6 +51,7 @@ export default function LoginPage() {
       // For demo, allow "student" / "password" or any ID starting with "S" like "S1001" / "password"
       if ((userId === 'student' && password === 'password') || (userId.toUpperCase().startsWith('S') && password === 'password')) {
         login(userId, role);
+        // No direct router.push here, AuthContext will redirect based on new user state
       } else {
         setError('Invalid student ID or password. Try ID "student" or "S1001" with password "password".');
       }
@@ -57,7 +59,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
   
-  // Show loading spinner if auth state is loading or if user is already logged in (and redirecting)
+  // Show loading spinner if auth state is loading OR if user is already logged in (and AuthContext is about to redirect)
   if (isLoading || (!isLoading && user)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
@@ -155,3 +157,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
