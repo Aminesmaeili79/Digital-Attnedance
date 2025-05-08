@@ -16,6 +16,7 @@ import { ClipboardList, LogOut, Loader2, PlayCircle, StopCircle, Timer, Info, Al
 import { useToast } from '@/hooks/use-toast';
 import type { AttendanceSession, CourseClass, CheckInData } from '@/types';
 import { format, formatDistanceToNowStrict, parseISO, isPast, isFuture } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 
 const SESSION_POLL_INTERVAL = 5000; // 5 seconds for session status
 
@@ -258,11 +259,13 @@ export default function InstructorDashboardPage() {
                         }}
                     >
                       <CardHeader className="pb-2 pt-3 px-3">
-                        <CardTitle className="text-sm font-semibold truncate flex items-center">
-                            <BookMarked className="w-4 h-4 mr-2 text-primary/80" />
-                            {cls.courseName}
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-semibold truncate flex items-center">
+                                <BookMarked className="w-4 h-4 mr-2 text-primary/80" />
+                                {cls.courseName}
+                            </CardTitle>
                             {statusBadge}
-                        </CardTitle>
+                        </div>
                         <CardDescription className="text-xs">
                             {cls.sessionNumber} - {cls.classroom}
                         </CardDescription>
@@ -370,7 +373,7 @@ export default function InstructorDashboardPage() {
               )}
 
               {attendanceSession?.status !== 'not_started' && (
-                <Badge variant={attendanceSession?.status === 'open' ? 'default' : attendanceSession?.status === 'closed_manual' || attendanceSession?.status === 'closed_timeout' ? 'destructive' : 'secondary'} className="capitalize">
+                <Badge variant={attendanceSession?.status === 'open' ? 'default' : attendanceSession?.status === 'closed_manual' || attendanceSession?.status === 'closed_timeout' ? 'destructive' : 'secondary'} className={`capitalize ${attendanceSession?.status === 'open' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
                   Session Status: {attendanceSession?.status.replace('_', ' ') || 'Not Started'}
                   {attendanceSession?.status === 'open' && attendanceSession.classId !== selectedClassId && " (For a different class)"}
                 </Badge>
@@ -430,3 +433,6 @@ export default function InstructorDashboardPage() {
     </div>
   );
 }
+
+
+    
