@@ -68,9 +68,9 @@ export function BluetoothScanner({ onDeviceSelected, selectedDeviceId }: Bluetoo
   // Generate random demo devices
   const generateDemoDevices = () => {
     const demoDevices = [
-      { id: 'demo-01', name: 'Demo iPhone 13' },
-      { id: 'demo-02', name: 'Demo Samsung Galaxy S22' },
-      { id: 'demo-03', name: 'Demo Google Pixel 6' },
+      { id: 'st101', name: 'st101' },
+      { id: 'st102', name: 'st102' },
+      { id: 'st103', name: 'st103' },
     ];
     setDevices(demoDevices);
     if (!selectedDeviceId) {
