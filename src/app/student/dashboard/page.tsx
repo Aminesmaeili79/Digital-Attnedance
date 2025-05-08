@@ -1,25 +1,152 @@
+
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, LogOut, BookOpen, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { UserCheck, LogOut, BookOpen, CheckCircle, AlertTriangle, Wifi, Loader2, Smartphone, Info, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
+import type { AttendanceSession } from '@/types';
+import { formatDistanceToNowStrict, parseISO } from 'date-fns';
+
+const BLUETOOTH_DEVICE_ID_KEY = 'attendease_bluetooth_device_id';
+const SESSION_POLL_INTERVAL = 5000; // 5 seconds
 
 export default function StudentDashboardPage() {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [attendanceSession, setAttendanceSession] = useState<AttendanceSession | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [lastCheckInStatus, setLastCheckInStatus] = useState<{success: boolean, message: string, sessionId: string | null} | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'student')) {
+    // Simulate getting a unique device ID (Bluetooth MAC address)
+    let storedDeviceId = localStorage.getItem(BLUETOOTH_DEVICE_ID_KEY);
+    if (!storedDeviceId) {
+      storedDeviceId = `simulated-bt-${crypto.randomUUID()}`;
+      localStorage.setItem(BLUETOOTH_DEVICE_ID_KEY, storedDeviceId);
+    }
+    setDeviceId(storedDeviceId);
+  }, []);
+
+  const fetchSessionStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/attendance/status');
+      if (!response.ok) {
+        throw new Error('Failed to fetch session status');
+      }
+      const sessionData: AttendanceSession = await response.json();
+      setAttendanceSession(sessionData);
+    } catch (error) {
+      console.error('Error fetching session status:', error);
+      // Don't toast on every poll failure, could be annoying
+    } finally {
+      setIsSessionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSessionStatus();
+    const intervalId = setInterval(fetchSessionStatus, SESSION_POLL_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [fetchSessionStatus]);
+
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== 'student')) {
       router.replace('/login');
     }
-  }, [user, isLoading, router]);
+  }, [user, authLoading, router]);
 
-  if (isLoading || !user || user.role !== 'student') {
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (attendanceSession?.status === 'open' && attendanceSession.autoCloseTime) {
+      const updateTimer = () => {
+        const autoCloseDate = parseISO(attendanceSession.autoCloseTime!);
+        if (new Date() < autoCloseDate) {
+          setTimeRemaining(formatDistanceToNowStrict(autoCloseDate, { addSuffix: true }));
+        } else {
+          setTimeRemaining("Closing...");
+          if (intervalId) clearInterval(intervalId);
+          // Optionally trigger a session status refresh here
+          // fetchSessionStatus();
+        }
+      };
+      updateTimer(); // Initial call
+      intervalId = setInterval(updateTimer, 1000); // Update every second
+    } else {
+      setTimeRemaining(null);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [attendanceSession]);
+
+
+  const handleCheckIn = async () => {
+    if (!user || !deviceId || !attendanceSession || attendanceSession.status !== 'open' || !attendanceSession.sessionId) {
+      toast({
+        title: 'Check-in Unavailable',
+        description: 'Attendance is not currently open or user/device info is missing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCheckingIn(true);
+    setLastCheckInStatus(null);
+
+    try {
+      const response = await fetch('/api/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: user.id,
+          bluetoothMacAddress: deviceId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Check-in Successful!',
+          description: result.message || `You've been marked present for session ${attendanceSession.sessionId}.`,
+          variant: 'default',
+          className: 'bg-green-500 text-white dark:bg-green-600',
+        });
+        setLastCheckInStatus({success: true, message: result.message, sessionId: attendanceSession.sessionId});
+      } else {
+        toast({
+          title: 'Check-in Failed',
+          description: result.message || 'Could not complete check-in.',
+          variant: 'destructive',
+        });
+         setLastCheckInStatus({success: false, message: result.message, sessionId: attendanceSession.sessionId});
+      }
+    } catch (error) {
+      console.error('Check-in API error:', error);
+      toast({
+        title: 'Check-in Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
+      setLastCheckInStatus({success: false, message: 'Network error or server unavailable.', sessionId: attendanceSession.sessionId});
+    } finally {
+      setIsCheckingIn(false);
+      fetchSessionStatus(); // Refresh session status after attempt
+    }
+  };
+  
+  if (authLoading || !user || user.role !== 'student' || isSessionLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
@@ -27,16 +154,9 @@ export default function StudentDashboardPage() {
       </div>
     );
   }
-
-  // Placeholder data - replace with actual data fetching
-  const attendanceStatus = {
-    checkedIn: Math.random() > 0.5, // Simulate if checked in for a current class
-    lastCheckIn: new Date(Date.now() - Math.random() * 1000 * 60 * 60 * 24).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  };
-  const upcomingClasses = [
-    { id: 1, name: 'Calculus 101', time: 'Tomorrow, 10:00 AM', room: 'Room A301' },
-    { id: 2, name: 'Physics for Engineers', time: 'Tomorrow, 02:00 PM', room: 'Lab B12' },
-  ];
+  
+  const isCheckedInForCurrentSession = lastCheckInStatus?.success && lastCheckInStatus.sessionId === attendanceSession?.sessionId;
+  const canAttemptCheckIn = attendanceSession?.status === 'open' && !isCheckedInForCurrentSession;
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/10">
@@ -74,63 +194,94 @@ export default function StudentDashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{user.id}</p>
-              <p className="text-xs text-muted-foreground">Your student identifier</p>
-              <Button variant="link" className="p-0 h-auto mt-3 text-sm" disabled>Edit Profile (Soon)</Button>
+              <p className="text-xs text-muted-foreground">Student Identifier</p>
+              {deviceId && (
+                <div className="mt-2 text-xs text-muted-foreground flex items-center">
+                  <Smartphone className="w-3 h-3 mr-1" /> Device ID: <span className="font-mono ml-1 truncate" title={deviceId}>{deviceId.substring(0, 20)}...</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Attendance Status</CardTitle>
-              {attendanceStatus.checkedIn ? <CheckCircle className="h-6 w-6 text-green-500" /> : <AlertTriangle className="h-6 w-6 text-yellow-500" />}
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 md:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium flex items-center">
+                <Wifi className="h-5 w-5 mr-2 text-primary" /> {/* Using Wifi icon as proxy for BLE/Connectivity */}
+                Attendance Check-in
+              </CardTitle>
+              {attendanceSession?.sessionId && <CardDescription>Session ID: {attendanceSession.sessionId}</CardDescription>}
             </CardHeader>
             <CardContent>
-               {attendanceStatus.checkedIn ? (
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">Checked In</p>
-              ) : (
-                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">Not Checked In</p>
+              {attendanceSession?.status === 'open' && (
+                <div className="p-3 mb-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+                  <div className="flex items-center text-green-700 dark:text-green-300">
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    <p className="font-semibold">Attendance is OPEN!</p>
+                  </div>
+                  {attendanceSession.startTime && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Started: {new Date(attendanceSession.startTime).toLocaleTimeString()}
+                    </p>
+                  )}
+                  {timeRemaining && (
+                     <p className="text-xs text-muted-foreground mt-1">
+                      Closes {timeRemaining}.
+                    </p>
+                  )}
+                   {!attendanceSession.autoCloseTime && (
+                     <p className="text-xs text-muted-foreground mt-1">
+                      Session will be closed manually by the instructor.
+                    </p>
+                  )}
+                </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                Last activity: {attendanceStatus.lastCheckIn}
-              </p>
-              <Button className="mt-3 w-full" disabled={attendanceStatus.checkedIn}>
-                <BookOpen className="mr-2 h-4 w-4" /> Check-in to Class (Soon)
+              {attendanceSession?.status === 'not_started' && (
+                <div className="p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg text-yellow-700 dark:text-yellow-300">
+                  <div className="flex items-center">
+                    <Info className="h-5 w-5 mr-2" />
+                    <p className="font-semibold">No active attendance session. Please wait for the instructor to start one.</p>
+                  </div>
+                </div>
+              )}
+              {(attendanceSession?.status === 'closed_manual' || attendanceSession?.status === 'closed_timeout') && (
+                <div className="p-3 mb-4 bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300">
+                   <div className="flex items-center">
+                    <XCircle className="h-5 w-5 mr-2" />
+                    <p className="font-semibold">Attendance is CLOSED.</p>
+                  </div>
+                  {attendanceSession.endTime && (
+                     <p className="text-xs text-muted-foreground mt-1">
+                      Closed at: {new Date(attendanceSession.endTime).toLocaleTimeString()}
+                      {attendanceSession.status === 'closed_timeout' && " (timed out)"}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <Button 
+                className="w-full text-lg py-3" 
+                onClick={handleCheckIn} 
+                disabled={!canAttemptCheckIn || isCheckingIn}
+              >
+                {isCheckingIn && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                {isCheckedInForCurrentSession ? (
+                  <>
+                    <CheckCircle className="mr-2 h-5 w-5 text-green-400" /> Checked In
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="mr-2 h-5 w-5" /> Check-in Now
+                  </>
+                )}
               </Button>
+              {!isCheckingIn && lastCheckInStatus && lastCheckInStatus.sessionId === attendanceSession?.sessionId && (
+                 <p className={`mt-2 text-sm text-center ${lastCheckInStatus.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {lastCheckInStatus.message}
+                </p>
+              )}
             </CardContent>
           </Card>
           
-          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg font-medium">Upcoming Classes</CardTitle>
-              <CardDescription>Your schedule for the next 24 hours.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {upcomingClasses.length > 0 ? (
-                upcomingClasses.map(cls => (
-                  <div key={cls.id} className="text-sm p-2 bg-secondary/50 rounded-md">
-                    <p className="font-semibold">{cls.name}</p>
-                    <p className="text-muted-foreground">{cls.time} - {cls.room}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No upcoming classes in the next 24 hours.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-3 shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg font-medium">Announcements</CardTitle>
-               <CardDescription>Important updates and notifications.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg text-center">
-                <p className="text-blue-700 dark:text-blue-300">
-                  Welcome to the new Student Portal! More features coming soon.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
        <footer className="text-center p-4 text-xs text-muted-foreground border-t mt-auto">
@@ -139,3 +290,4 @@ export default function StudentDashboardPage() {
     </div>
   );
 }
+

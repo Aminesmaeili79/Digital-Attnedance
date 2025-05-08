@@ -1,6 +1,17 @@
+export interface AttendanceSession {
+  sessionId: string | null; // Unique ID for each attendance session
+  status: 'not_started' | 'open' | 'closed_manual' | 'closed_timeout';
+  startTime?: string; // ISO string
+  endTime?: string;   // ISO string (calculated if duration is set, or when manually closed)
+  durationMinutes?: number;
+  // A timestamp for when the session is expected to auto-close due to duration
+  autoCloseTime?: string; // ISO string 
+}
+
 export interface CheckInData {
-  id: string; // Assuming API might provide an ID, or we can generate one on client if needed for keys
+  id: string;
   studentId: string;
-  macAddress: string;
-  timestamp: string; // ISO date string e.g. "2024-07-15T10:30:00.000Z"
+  bluetoothMacAddress: string; // This will be a simulated unique device ID
+  timestamp: string; // ISO date string
+  sessionId: string; // To link check-in to a specific session
 }
