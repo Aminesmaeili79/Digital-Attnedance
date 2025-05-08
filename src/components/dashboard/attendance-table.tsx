@@ -33,24 +33,40 @@ export default function AttendanceTable({ checkIns, currentSessionId, sessionSta
     if (sessionStatus === 'closed_manual' || sessionStatus === 'closed_timeout') {
       return `Showing check-ins for closed session: ${currentSessionId}.`;
     }
+    if (sessionStatus === 'not_started') {
+        return `No active session. Start a session to see check-ins.`;
+    }
     return `Check-ins for session: ${currentSessionId}.`;
   };
 
-  if (checkIns.length === 0) {
+  if (!currentSessionId && (sessionStatus === 'not_started' || sessionStatus === null)) {
     return (
       <div className="flex flex-col items-center justify-center h-64 border border-dashed rounded-lg p-4 text-center">
         <CalendarCheck2 className="w-16 h-16 text-muted-foreground mb-4" />
         <p className="text-muted-foreground text-lg">
-          {currentSessionId ? `No check-ins recorded yet for session ${currentSessionId}.` : "No session active."}
+          No attendance session active.
+        </p>
+        <p className="text-sm text-muted-foreground">Select a class and start a session to begin collecting attendance.</p>
+      </div>
+    );
+  }
+  
+  if (checkIns.length === 0 && currentSessionId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 border border-dashed rounded-lg p-4 text-center">
+        <CalendarCheck2 className="w-16 h-16 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground text-lg">
+          {`No check-ins recorded yet for session ${currentSessionId}.`}
         </p>
         {sessionStatus === 'open' && <p className="text-sm text-muted-foreground">Waiting for students to check in...</p>}
-         {!currentSessionId && <p className="text-sm text-muted-foreground">Start a session to see live check-ins.</p>}
+        {(sessionStatus === 'closed_manual' || sessionStatus === 'closed_timeout') && <p className="text-sm text-muted-foreground">This session has ended and had no check-ins.</p>}
       </div>
     );
   }
 
+
   return (
-    <ScrollArea className="h-[calc(100vh-400px)] md:h-[calc(100vh-420px)] rounded-md border shadow-md">
+    <ScrollArea className="h-[calc(100vh-450px)] md:h-[calc(100vh-480px)] rounded-md border shadow-md">
       <Table>
         <TableCaption>
           {renderCaption()}
@@ -94,18 +110,12 @@ export default function AttendanceTable({ checkIns, currentSessionId, sessionSta
               formattedTimestamp = checkIn.timestamp; 
             }
             
-            // All check-ins passed to this table should belong to the currentSessionId
-            // due to filtering in DashboardClient. So, isCurrentSessionCheckIn is effectively always true here.
-            // If displaying mixed sessions were a feature, this would be more relevant.
-            const isCurrentSessionCheckIn = checkIn.sessionId === currentSessionId;
-
             return (
               <TableRow 
                 key={checkIn.id || `${checkIn.studentId}-${checkIn.timestamp}`}
-                // className={!isCurrentSessionCheckIn ? 'opacity-50' : ''} // Likely not needed due to parent filtering
               >
                 <TableCell className="font-medium">
-                  <Badge variant={isCurrentSessionCheckIn ? "default" : "outline"}>{checkIn.studentId}</Badge>
+                  <Badge variant={"default"}>{checkIn.studentId}</Badge>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{checkIn.bluetoothMacAddress}</TableCell>
                 <TableCell>

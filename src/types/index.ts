@@ -1,5 +1,15 @@
+export interface CourseClass {
+  id: string;
+  courseName: string;
+  sessionNumber: string; // e.g., "Session 1", "Midterm Exam"
+  scheduledTime: string; // ISO string
+  classroom: string;
+  totalStudents: number;
+}
+
 export interface AttendanceSession {
   sessionId: string | null; // Unique ID for each attendance session
+  classId?: string | null; // Optional ID of the class this session is for
   status: 'not_started' | 'open' | 'closed_manual' | 'closed_timeout';
   startTime?: string; // ISO string
   endTime?: string;   // ISO string (calculated if duration is set, or when manually closed)

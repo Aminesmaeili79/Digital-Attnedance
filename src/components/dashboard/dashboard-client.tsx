@@ -6,7 +6,7 @@ import AttendanceTable from './attendance-table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { WifiOff, Loader2, ServerCrash } from 'lucide-react'; 
+import { Loader2, ServerCrash } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
@@ -19,9 +19,16 @@ const generateId = () => `client-checkin-${idCounter++}`;
 interface DashboardClientProps {
   currentSessionId: string | null;
   currentSessionStatus: AttendanceSession['status'] | null;
+  currentSessionClassId: string | null; // Added to know which class the session is for
+  onCheckInsUpdate?: (checkIns: CheckInData[]) => void; // Callback to pass check-ins up
 }
 
-export default function DashboardClient({ currentSessionId, currentSessionStatus }: DashboardClientProps) {
+export default function DashboardClient({ 
+  currentSessionId, 
+  currentSessionStatus,
+  currentSessionClassId,
+  onCheckInsUpdate 
+}: DashboardClientProps) {
   const [checkIns, setCheckIns] = useState<CheckInData[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +48,7 @@ export default function DashboardClient({ currentSessionId, currentSessionStatus
       }
       const allData: any[] = await response.json();
       
+      // Filter check-ins relevant to the currently active session ID
       const relevantData = currentSessionId 
         ? allData.filter(item => item.sessionId === currentSessionId) 
         : []; 
@@ -51,6 +59,9 @@ export default function DashboardClient({ currentSessionId, currentSessionStatus
       })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       setCheckIns(processedData);
+      if (onCheckInsUpdate) {
+        onCheckInsUpdate(processedData); // Pass updated check-ins to parent
+      }
 
       if (isInitialLoad && currentSessionId && currentSessionStatus === 'open') { 
          toast({
@@ -76,38 +87,36 @@ export default function DashboardClient({ currentSessionId, currentSessionStatus
         setIsLoading(false);
       }
     }
-  }, [toast, currentSessionId, currentSessionStatus]); 
+  }, [toast, currentSessionId, currentSessionStatus, onCheckInsUpdate]); 
 
   useEffect(() => {
-    fetchCheckIns(true); 
-
+    // Initial fetch or when session ID changes
+    if (currentSessionId) {
+        fetchCheckIns(true);
+    } else {
+        setCheckIns([]); // Clear check-ins if no session is active
+        if (onCheckInsUpdate) onCheckInsUpdate([]);
+        setIsLoading(false);
+    }
+    
     const intervalId = setInterval(() => {
-      // Only poll for check-ins if the session is open
-      if (currentSessionStatus === 'open') {
+      if (currentSessionStatus === 'open' && currentSessionId) {
         fetchCheckIns(false);
       }
     }, POLLING_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, [fetchCheckIns, currentSessionStatus]); 
-
-  useEffect(() => {
-    // Re-fetch when currentSessionId changes (e.g., new session started or looking at old session)
-    // The `undefined` check is to avoid an initial double fetch if currentSessionId starts as null then becomes a specific ID.
-    if (currentSessionId !== undefined) { 
-      fetchCheckIns(true); 
-    }
-  }, [currentSessionId]); // Only depend on currentSessionId for this effect
+  }, [fetchCheckIns, currentSessionId, currentSessionStatus, onCheckInsUpdate]);
 
 
-  if (isLoading && !checkIns.length) { 
+  if (isLoading && !checkIns.length && currentSessionId) { 
     return (
-      <Card className="flex-grow">
+      <Card className="flex-grow mt-6 md:mt-0">
         <CardContent className="p-6 h-full">
           <div className="space-y-4">
             <div className="flex items-center justify-center text-muted-foreground py-8">
               <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
-              <p className="text-lg">Loading attendance list...</p>
+              <p className="text-lg">Loading attendance list for current session...</p>
             </div>
             {[...Array(3)].map((_, i) => ( 
               <div key={i} className="flex items-center space-x-4 p-2 border rounded-md">
@@ -123,7 +132,7 @@ export default function DashboardClient({ currentSessionId, currentSessionStatus
   }
 
   return (
-    <Card className="flex-grow flex flex-col shadow-lg">
+    <Card className="flex-grow flex flex-col shadow-lg mt-6 md:mt-0">
       <CardContent className="p-4 md:p-6 flex-grow flex flex-col">
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -148,11 +157,16 @@ export default function DashboardClient({ currentSessionId, currentSessionStatus
         </div>
          {!currentSessionId && !isLoading && !error && (
             <div className="text-center text-muted-foreground p-4 mt-4 border border-dashed rounded-md">
-                No active attendance session to display check-ins for. Start a session using the controls above.
+                No active attendance session to display check-ins for. Select a class and start a session.
             </div>
         )}
+         {currentSessionId && checkIns.length === 0 && !isLoading && !error && (
+            <div className="text-center text-muted-foreground p-4 mt-4 border border-dashed rounded-md">
+                No check-ins yet for session {currentSessionId}.
+                {currentSessionStatus === 'open' && " Waiting for students..."}
+            </div>
+         )}
       </CardContent>
     </Card>
   );
 }
-

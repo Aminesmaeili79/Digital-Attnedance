@@ -7,19 +7,24 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const durationMinutes = body.durationMinutes ? parseInt(body.durationMinutes as string, 10) : null;
+    const classId = body.classId as string | undefined;
+
+    if (!classId) {
+      return NextResponse.json({ message: 'Class ID is required to start a session.' }, { status: 400 });
+    }
 
     if (store.currentAttendanceSession.status === 'open') {
-      return NextResponse.json({ message: 'An attendance session is already open.' }, { status: 400 });
+      return NextResponse.json({ message: 'An attendance session is already open. Please end it before starting a new one.' }, { status: 400 });
     }
 
     clearSessionTimeout(); // Clear any previous timeout just in case
 
     const newSessionId = `session-${store.nextSessionIdCounter++}`;
     const startTime = new Date();
-    let autoCloseTime : string | undefined = undefined;
-
+    
     store.currentAttendanceSession = {
       sessionId: newSessionId,
+      classId: classId, // Store the classId
       status: 'open',
       startTime: startTime.toISOString(),
       durationMinutes: durationMinutes || undefined,
@@ -33,7 +38,7 @@ export async function POST(request: NextRequest) {
       setSessionTimeout(durationMinutes * 60 * 1000, newSessionId);
     }
 
-    console.log(`Attendance session ${newSessionId} started. Duration: ${durationMinutes ? durationMinutes + ' mins' : 'manual'}`);
+    console.log(`Attendance session ${newSessionId} for class ${classId} started. Duration: ${durationMinutes ? durationMinutes + ' mins' : 'manual'}`);
     return NextResponse.json(store.currentAttendanceSession);
 
   } catch (error) {

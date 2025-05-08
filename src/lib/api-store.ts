@@ -4,7 +4,7 @@ import type { CheckInData, AttendanceSession } from '@/types';
 interface ApiStore {
   checkInsData: CheckInData[];
   nextCheckInIdCounter: number;
-  currentAttendanceSession: AttendanceSession;
+  currentAttendanceSession: AttendanceSession; // classId is now part of AttendanceSession type
   nextSessionIdCounter: number;
   // Timeout ID for automatic session closing
   sessionTimeoutId: NodeJS.Timeout | null;
@@ -15,6 +15,7 @@ export const store: ApiStore = {
   nextCheckInIdCounter: 1,
   currentAttendanceSession: {
     sessionId: null,
+    classId: null, // Initialize classId
     status: 'not_started',
   },
   nextSessionIdCounter: 1,
