@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+// import { GeistMono } from 'geist/font/mono'; // Removed as it's causing a build error and not critical
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 
 const geistSans = GeistSans;
-const geistMono = GeistMono;
+// const geistMono = GeistMono; // Removed
 
 export const metadata: Metadata = {
   title: 'AttendEase Dashboard',
@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${geistSans.variable} h-full`} suppressHydrationWarning>
       <body className="h-full antialiased">
         <ThemeProvider
           attribute="class"
